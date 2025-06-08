@@ -11,7 +11,7 @@ import (
 	"github.com/IBM/sarama"
 	gokasdk "github.com/lovoo/goka"
 	"github.com/lovoo/goka/codec"
-	"github.com/oxymoron0/mongoConsumerbahamasBackend/goka"
+	"github.com/oxymoron0/sensorflow-goka/goka"
 )
 
 var (
