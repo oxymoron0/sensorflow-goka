@@ -1,0 +1,21 @@
+brokers:
+  - example.com:9092
+  - example.com:9093
+  - example.com:9094
+topic: test-topic
+group: test-group
+
+sasl:
+  enable: true
+  user: your-username
+  password: your-password
+  mechanism: PLAIN
+
+tls:
+  enable: false
+
+replication:
+  table: 1
+  stream: 1
+
+partitions: 8
