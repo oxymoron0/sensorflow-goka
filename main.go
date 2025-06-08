@@ -37,7 +37,7 @@ func init() {
 	tmc.Stream.Replication = cfg.Replication.Stream
 }
 
-// runEmitter는 메시지를 지속적으로 발행합니다.
+// runEmitter는 메시지를 지속적으로 발행합니다. => Producer
 func runEmitter() {
 	// Emitter 생성: 브로커, 토픽, 코덱 지정
 	emitter, err := gokasdk.NewEmitter(brokers, topic, new(codec.String))
@@ -56,7 +56,7 @@ func runEmitter() {
 	}
 }
 
-// runProcessor는 메시지를 처리하고 상태를 업데이트합니다.
+// runProcessor는 메시지를 처리하고 상태를 업데이트합니다. => Consumer
 func runProcessor() {
 	// 프로세스 콜백: "example-stream" 토픽에서 메시지가 전달될 때마다 호출됨
 	cb := func(ctx gokasdk.Context, msg interface{}) {
