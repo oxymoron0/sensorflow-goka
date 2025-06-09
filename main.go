@@ -2,12 +2,10 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/IBM/sarama"
 	"github.com/lovoo/goka"
@@ -21,6 +19,7 @@ var (
 	topic   goka.Stream
 	group   goka.Group
 	tmc     *goka.TopicManagerConfig
+	config  *sarama.Config
 )
 
 func init() {
@@ -29,13 +28,19 @@ func init() {
 	if err != nil {
 		log.Fatalf("Config load error: %v", err)
 	}
-	brokers = cfg.Brokers
-	topic = goka.Stream(cfg.Topic)
-	group = goka.Group(cfg.Group)
+	brokers = cfg.Broker.Brokers
+	topic = goka.Stream(cfg.Broker.Topic)
+	group = goka.Group(cfg.Broker.Group)
 
 	tmc = goka.NewTopicManagerConfig()
-	tmc.Table.Replication = cfg.Replication.Table
-	tmc.Stream.Replication = cfg.Replication.Stream
+	tmc.Table.Replication = cfg.Broker.Replication.Table
+	tmc.Stream.Replication = cfg.Broker.Replication.Stream
+
+	// 전역 설정 초기화
+	config, err = gokaManager.InitGlobalConfig(&cfg)
+	if err != nil {
+		log.Fatalf("Error initializing global config: %v", err)
+	}
 }
 
 // runProcessor는 메시지를 처리하고 상태를 업데이트합니다. => Consumer
@@ -90,19 +95,6 @@ func runProcessor() {
 }
 
 func main() {
-	config := goka.DefaultConfig()
-	// SASL 인증 정보 설정 (유저명/비밀번호)
-	config.Net.SASL.Enable = cfg.SASL.Enable
-	config.Net.SASL.User = cfg.SASL.User
-	config.Net.SASL.Password = cfg.SASL.Password
-	config.Net.SASL.Mechanism = sarama.SASLMechanism(cfg.SASL.Mechanism)
-	// TLS 활성화
-	config.Net.TLS.Enable = cfg.TLS.Enable
-
-	// 프로세서가 이미터보다 시작이 느릴 수 있으므로, 이 설정을 하지 않으면 첫 메시지를 소비하지 못할 수 있습니다.
-	config.Consumer.Offsets.Initial = sarama.OffsetOldest
-	goka.ReplaceGlobalConfig(config)
-
 	// 토픽 매니저 생성 및 스트림 토픽이 존재하는지 확인
 	tm, err := goka.NewTopicManager(brokers, config, tmc)
 	if err != nil {
@@ -111,33 +103,31 @@ func main() {
 	defer tm.Close()
 
 	// 토픽이 없으면 생성 (이 작업이 반드시 끝나야 함)
-	err = tm.EnsureStreamExists(string(topic), cfg.Partitions)
+	err = tm.EnsureStreamExists(string(topic), cfg.Broker.Partitions)
 	if err != nil {
 		log.Fatalf("Error creating kafka topic %s: %v", topic, err)
 	}
 
-	emitterManager := gokaManager.GetEmitterManager()
-	emitterManager.AddEmitter(string(topic))
-	emitter, err := emitterManager.GetEmitter(string(topic))
-	if err != nil {
-		log.Fatalf("Error getting emitter: %v", err)
-	}
+	// Emitter Manager 초기화
+	// emitterManager, err := gokaManager.GetEmitterManager()
+	// if err != nil {
+	// 	log.Fatalf("Error getting emitter manager: %v", err)
+	// }
 
-	go func() {
-		for i := 0; i < 10; i++ {
-			emitter.EmitSync(fmt.Sprintf("some-key-%d", i), fmt.Sprintf("some-value-%d from emitter manager", i))
-			fmt.Printf("Emitter %d\n", i)
-			time.Sleep(1 * time.Second)
-		}
-	}()
+	// // Emitter 추가 및 가져오기
+	// emitterManager.AddEmitter(string(topic))
+	// emitter, err := emitterManager.GetEmitter(string(topic))
+	// if err != nil {
+	// 	log.Fatalf("Error getting emitter: %v", err)
+	// }
 
-	go func() {
-		for i := 0; i < 10; i++ {
-			emitter.EmitSync(fmt.Sprintf("other-key-001-%d", i), fmt.Sprintf("some-value-%d from emitter manager", i))
-			fmt.Printf("Emitter %d\n", i)
-			time.Sleep(1 * time.Second)
-		}
-	}()
+	// go func() {
+	// 	for i := 0; i < 10; i++ {
+	// 		emitter.EmitSync(fmt.Sprintf("other-key-001-%d", i), fmt.Sprintf("some-value-%d from emitter manager", i))
+	// 		fmt.Printf("Emitter %d\n", i)
+	// 		time.Sleep(1 * time.Second)
+	// 	}
+	// }()
 
 	// 토픽이 확실히 존재한 후 Emitter/Processor 실행
 	runProcessor() // 프로세서 시작

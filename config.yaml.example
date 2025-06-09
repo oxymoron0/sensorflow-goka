@@ -1,21 +1,22 @@
-brokers:
-  - example.com:9092
-  - example.com:9093
-  - example.com:9094
-topic: test-topic
-group: test-group
+global:
+  sasl:
+    enable: true
+    user: "username"
+    password: "password"
+    mechanism: "PLAIN"
+  tls:
+    enable: true
+  consumer:
+    initial_offset: "oldest"
 
-sasl:
-  enable: true
-  user: your-username
-  password: your-password
-  mechanism: PLAIN
-
-tls:
-  enable: false
-
-replication:
-  table: 1
-  stream: 1
-
-partitions: 8
+broker:
+  brokers:
+    - "localhost:9092"
+    - "localhost:9093"
+    - "localhost:9094"
+  topic: "example-topic"
+  group: "example-group"
+  replication:
+    table: 1
+    stream: 1
+  partitions: 3
