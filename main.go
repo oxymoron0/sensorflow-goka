@@ -141,9 +141,26 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error getting emitter: %v", err)
 	}
+
 	go func() {
 		for i := 0; i < 10; i++ {
 			emitter.EmitSync(fmt.Sprintf("some-key-%d", i), fmt.Sprintf("some-value-%d from emitter manager", i))
+			fmt.Printf("Emitter %d\n", i)
+			time.Sleep(1 * time.Second)
+		}
+	}()
+
+	go func() {
+		for i := 0; i < 10; i++ {
+			emitter.EmitSync(fmt.Sprintf("other-key-001-%d", i), fmt.Sprintf("some-value-%d from emitter manager", i))
+			fmt.Printf("Emitter %d\n", i)
+			time.Sleep(1 * time.Second)
+		}
+	}()
+
+	go func() {
+		for i := 0; i < 10; i++ {
+			emitter.EmitSync(fmt.Sprintf("other-key-002-%d", i), fmt.Sprintf("some-value-%d from emitter manager", i))
 			fmt.Printf("Emitter %d\n", i)
 			time.Sleep(1 * time.Second)
 		}
