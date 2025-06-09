@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -133,6 +134,20 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error creating kafka topic %s: %v", topic, err)
 	}
+
+	emitterManager := goka.GetEmitterManager()
+	emitterManager.AddEmitter(string(topic))
+	emitter, err := emitterManager.GetEmitter(string(topic))
+	if err != nil {
+		log.Fatalf("Error getting emitter: %v", err)
+	}
+	go func() {
+		for i := 0; i < 10; i++ {
+			emitter.EmitSync(fmt.Sprintf("some-key-%d", i), fmt.Sprintf("some-value-%d from emitter manager", i))
+			fmt.Printf("Emitter %d\n", i)
+			time.Sleep(1 * time.Second)
+		}
+	}()
 
 	// 토픽이 확실히 존재한 후 Emitter/Processor 실행
 	go runEmitter() // 메시지 발행 시작
