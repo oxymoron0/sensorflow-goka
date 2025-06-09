@@ -5,6 +5,7 @@ go 1.24.1
 require (
 	github.com/IBM/sarama v1.45.2
 	github.com/lovoo/goka v1.1.14
+	gopkg.in/yaml.v2 v2.4.0
 )
 
 require (
@@ -30,5 +31,4 @@ require (
 	golang.org/x/crypto v0.39.0 // indirect
 	golang.org/x/net v0.41.0 // indirect
 	golang.org/x/sync v0.15.0 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
