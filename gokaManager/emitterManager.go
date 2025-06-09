@@ -1,4 +1,4 @@
-package goka
+package gokaManager
 
 import (
 	"errors"

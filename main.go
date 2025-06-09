@@ -10,57 +10,38 @@ import (
 	"time"
 
 	"github.com/IBM/sarama"
-	gokasdk "github.com/lovoo/goka"
+	"github.com/lovoo/goka"
 	"github.com/lovoo/goka/codec"
-	"github.com/oxymoron0/sensorflow-goka/goka"
+	"github.com/oxymoron0/sensorflow-goka/gokaManager"
 )
 
 var (
-	cfg     goka.AppConfig
+	cfg     gokaManager.AppConfig
 	brokers []string
-	topic   gokasdk.Stream
-	group   gokasdk.Group
-	tmc     *gokasdk.TopicManagerConfig
+	topic   goka.Stream
+	group   goka.Group
+	tmc     *goka.TopicManagerConfig
 )
 
 func init() {
 	var err error
-	cfg, err = goka.LoadConfig("config.yaml")
+	cfg, err = gokaManager.LoadConfig("config.yaml")
 	if err != nil {
 		log.Fatalf("Config load error: %v", err)
 	}
 	brokers = cfg.Brokers
-	topic = gokasdk.Stream(cfg.Topic)
-	group = gokasdk.Group(cfg.Group)
+	topic = goka.Stream(cfg.Topic)
+	group = goka.Group(cfg.Group)
 
-	tmc = gokasdk.NewTopicManagerConfig()
+	tmc = goka.NewTopicManagerConfig()
 	tmc.Table.Replication = cfg.Replication.Table
 	tmc.Stream.Replication = cfg.Replication.Stream
-}
-
-// runEmitter는 메시지를 지속적으로 발행합니다. => Producer
-func runEmitter() {
-	// Emitter 생성: 브로커, 토픽, 코덱 지정
-	emitter, err := gokasdk.NewEmitter(brokers, topic, new(codec.String))
-	if err != nil {
-		log.Fatalf("error creating emitter: %v", err)
-	}
-	defer emitter.Finish() // defer를 사용하여 모든 메시지 발행이 완료될 때까지 기다림
-
-	for {
-		time.Sleep(1 * time.Second)
-		// "some-key"로 "some-value"를 동기적으로 발행
-		err = emitter.EmitSync("some-key", "some-value")
-		if err != nil {
-			log.Fatalf("error emitting message: %v", err)
-		}
-	}
 }
 
 // runProcessor는 메시지를 처리하고 상태를 업데이트합니다. => Consumer
 func runProcessor() {
 	// 프로세스 콜백: "example-stream" 토픽에서 메시지가 전달될 때마다 호출됨
-	cb := func(ctx gokasdk.Context, msg interface{}) {
+	cb := func(ctx goka.Context, msg interface{}) {
 		var counter int64
 		// ctx.Value()를 사용하여 그룹 테이블에서 메시지 키에 저장된 값을 가져옴
 		if val := ctx.Value(); val != nil {
@@ -74,16 +55,16 @@ func runProcessor() {
 
 	// 프로세서 그룹 정의: 입력, 출력 및 직렬화 형식 정의
 	// 그룹 테이블 토픽은 "example-group-table"
-	g := gokasdk.DefineGroup(group,
-		gokasdk.Input(topic, new(codec.String), cb), // 입력 스트림 및 콜백 정의
-		gokasdk.Persist(new(codec.Int64)),           // 그룹 테이블에 정수형 값 지속
+	g := goka.DefineGroup(group,
+		goka.Input(topic, new(codec.String), cb), // 입력 스트림 및 콜백 정의
+		goka.Persist(new(codec.Int64)),           // 그룹 테이블에 정수형 값 지속
 	)
 
 	// 새로운 프로세서 생성
-	p, err := gokasdk.NewProcessor(brokers,
+	p, err := goka.NewProcessor(brokers,
 		g,
-		gokasdk.WithTopicManagerBuilder(gokasdk.TopicManagerBuilderWithTopicManagerConfig(tmc)),
-		gokasdk.WithConsumerGroupBuilder(gokasdk.DefaultConsumerGroupBuilder),
+		goka.WithTopicManagerBuilder(goka.TopicManagerBuilderWithTopicManagerConfig(tmc)),
+		goka.WithConsumerGroupBuilder(goka.DefaultConsumerGroupBuilder),
 	)
 	if err != nil {
 		log.Fatalf("error creating processor: %v", err)
@@ -109,7 +90,7 @@ func runProcessor() {
 }
 
 func main() {
-	config := gokasdk.DefaultConfig()
+	config := goka.DefaultConfig()
 	// SASL 인증 정보 설정 (유저명/비밀번호)
 	config.Net.SASL.Enable = cfg.SASL.Enable
 	config.Net.SASL.User = cfg.SASL.User
@@ -120,10 +101,10 @@ func main() {
 
 	// 프로세서가 이미터보다 시작이 느릴 수 있으므로, 이 설정을 하지 않으면 첫 메시지를 소비하지 못할 수 있습니다.
 	config.Consumer.Offsets.Initial = sarama.OffsetOldest
-	gokasdk.ReplaceGlobalConfig(config)
+	goka.ReplaceGlobalConfig(config)
 
 	// 토픽 매니저 생성 및 스트림 토픽이 존재하는지 확인
-	tm, err := gokasdk.NewTopicManager(brokers, config, tmc)
+	tm, err := goka.NewTopicManager(brokers, config, tmc)
 	if err != nil {
 		log.Fatalf("Error creating topic manager: %v", err)
 	}
@@ -135,7 +116,7 @@ func main() {
 		log.Fatalf("Error creating kafka topic %s: %v", topic, err)
 	}
 
-	emitterManager := goka.GetEmitterManager()
+	emitterManager := gokaManager.GetEmitterManager()
 	emitterManager.AddEmitter(string(topic))
 	emitter, err := emitterManager.GetEmitter(string(topic))
 	if err != nil {
@@ -158,15 +139,6 @@ func main() {
 		}
 	}()
 
-	go func() {
-		for i := 0; i < 10; i++ {
-			emitter.EmitSync(fmt.Sprintf("other-key-002-%d", i), fmt.Sprintf("some-value-%d from emitter manager", i))
-			fmt.Printf("Emitter %d\n", i)
-			time.Sleep(1 * time.Second)
-		}
-	}()
-
 	// 토픽이 확실히 존재한 후 Emitter/Processor 실행
-	go runEmitter() // 메시지 발행 시작
-	runProcessor()  // 프로세서 시작
+	runProcessor() // 프로세서 시작
 }
